@@ -84,8 +84,16 @@ class DropdownMenu(UserControl):
         obj = self.controls_list["data"]
         obj.height = 50
         obj.update()
+    
+
+    
 
     async def filter_data_table(self, e):
+
+        # Call to action when particular selction is made.
+        def text_b_clicked(e):
+            print(e.control.text)
+
         records = await Database.async_select_users()
         name_list = Column(
             scroll="auto",
@@ -115,8 +123,11 @@ class DropdownMenu(UserControl):
                                 visible=True,
                                 alignment=MainAxisAlignment.SPACE_BETWEEN,
                                 controls=[
-                                    Text(name, size=12),
-                                    Text("name", italic=True, size=10, color="white54"),
+                                    # Convert to TextButton
+                                    # Retrieve Text Value once clicked.
+                                    # Text(name, size=12),
+                                    # Text("name", italic=True, size=10, color="white54"),
+                                    TextButton(text=name, on_click=text_b_clicked)
                                 ],
                             )
                         )
