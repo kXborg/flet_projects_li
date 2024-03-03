@@ -1,67 +1,7 @@
 import flet
 from flet import *
 import asyncio
-import aiosqlite
-
-
-class Database:
-    def async_with_connection(func):
-        async def wrapper(*args, **kwargs):
-            connection = await aiosqlite.connect("./database.db")
-            try:
-                result = await func(connection, *args, **kwargs)
-                await connection.commit()
-                return result
-            finally:
-                await connection.close()
-
-        return wrapper
-
-    @async_with_connection
-    async def async_create_table(connection):
-        cursor = await connection.cursor()
-        await cursor.execute(
-            """CREATE TABLE if not exists users (id INTEGER PRIMARY KEY, name TEXT)"""
-        )
-
-    @async_with_connection
-    async def async_insert_user(connection, name):
-        cursor = await connection.cursor()
-        await cursor.execute("INSERT INTO users (name) VALUES (?)", (name,))
-
-    @async_with_connection
-    async def async_select_users(connection):
-        cursor = await connection.cursor()
-        await cursor.execute("SELECT name FROM users")
-        return await cursor.fetchall()
-
-    async def start():
-        names = [
-            "George",
-            "Shawn",
-            "Robert",
-            "Steven",
-            "William",
-            "James",
-            "Christopher",
-            "James",
-            "Michael",
-            "Donovan",
-            "Jessica",
-            "Stephanie",
-            "Ann",
-            "Emma",
-            "Heather",
-            "Anna",
-            "Kelli",
-            "Pauline",
-            "Tanya",
-            "Kathy",
-        ]
-
-        for name in names:
-            await Database.async_insert_user(name)
-
+from getdata import request_data
 
 class DropdownMenu(UserControl):
     def __init__(self):
@@ -71,9 +11,7 @@ class DropdownMenu(UserControl):
     def check_instance(self, e, height):
         obj = self.controls_list["data"]
         if height == 0:
-            self.controls_list["search"].content.controls[
-                2
-            ].value = f"{height} results found"
+            self.controls_list["search"].content.controls[2].value = f"{height} results found"
             self.controls_list["search"].content.update()
             self.leave(e)
         else:
@@ -84,17 +22,31 @@ class DropdownMenu(UserControl):
         obj = self.controls_list["data"]
         obj.height = 50
         obj.update()
-    
-
-    
 
     async def filter_data_table(self, e):
 
         # Call to action when particular selction is made.
         def text_b_clicked(e):
             print(e.control.text)
+            # Read the corresponding row of the selected design
+            # We will use this data to display below.
+            design_inventory = recorded_data[recorded_data["Design-No"] == e.control.text]
+            print(design_inventory)
+            # Collapse result window once required option is selected.
+            self.leave(e)
+            # Display text if clicked
+            # Access the data container in your GUI and add the new Column
+            self.controls_list["display"].content.controls[0].text = design_inventory.to_string(index=False)
+            self.controls_list["display"].content.update()
+            
+        # Get data from CSV. It is a dataframe.
+        recorded_data = request_data()
+        
+        # Access column 0: "All Designs" in our case. Column 0 is a dataframe,
+        # It has to be converted to a list for our convenience.
+        records = recorded_data["Design-No"]
+        # print(records.tolist())
 
-        records = await Database.async_select_users()
         name_list = Column(
             scroll="auto",
             spacing=20,
@@ -112,29 +64,22 @@ class DropdownMenu(UserControl):
             self.controls_list["search"].content.controls[2].value = f"0 results found"
             self.controls_list["search"].content.update()
             self.leave(e)
-            self.leave(e)
+            # self.leave(e)
         else:
             count = 0
-            for names in records:
-                for name in names:
-                    if e.data.lower() in name.lower():
-                        name_list.controls.append(
-                            Row(
-                                visible=True,
-                                alignment=MainAxisAlignment.SPACE_BETWEEN,
-                                controls=[
-                                    # Convert to TextButton
-                                    # Retrieve Text Value once clicked.
-                                    # Text(name, size=12),
-                                    # Text("name", italic=True, size=10, color="white54"),
-                                    TextButton(text=name, on_click=text_b_clicked)
-                                ],
-                            )
+            for name in records.tolist():
+                if e.data.lower() in name.lower():
+                    name_list.controls.append(
+                        Row(
+                            visible=True,
+                            alignment=MainAxisAlignment.SPACE_BETWEEN,
+                            controls=[
+                                TextButton(text=name, on_click=text_b_clicked)
+                            ],
                         )
-                        count += 1
-                self.controls_list["search"].content.controls[
-                    2
-                ].value = f"{count} results found"
+                    )
+                    count += 1
+                self.controls_list["search"].content.controls[2].value = f"{count} results found"
                 self.controls_list["search"].content.update()
                 self.check_instance(e, count)
 
@@ -184,17 +129,33 @@ class DropdownMenu(UserControl):
         )
         self.controls_list["data"] = _object_
         return _object_
-
-    def build(self):
-        return Stack(
-            width=450,
-            height=500,
-            expand=True,
-            controls=[
-                self.drop_down_data_box(),
-                self.drop_down_search(),
+    
+    def inventory_display(self):
+        # Returns the inventory display UI element
+        # It will be updated during call to action functions later.
+        _object_ = Container(
+            bgcolor="blue10",
+            border_radius=6,
+            alignment=alignment.bottom_center,
+            content=[
+                Text(size=10, color="green10"),
             ],
         )
+        self.controls_list["display"] = _object_
+        return _object_
+    
+
+    def build(self):
+        return Column(
+                    width=450,
+                    height=500,
+                    expand=True,
+                    controls=[
+                        self.drop_down_data_box(), 
+                        self.drop_down_search(),
+                        self.inventory_display(),
+                     ],
+                )
 
 
 def main(page: Page):
@@ -207,7 +168,4 @@ def main(page: Page):
 
 
 if __name__ == "__main__":
-    # # Run this once...
-    # asyncio.run(Database.async_create_table())
-    # asyncio.run(Database.start())
     flet.app(target=main)
